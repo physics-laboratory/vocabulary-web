@@ -7,8 +7,12 @@
   <script src="https://unpkg.com/@supabase/supabase-js"></script>
   <style>
     :root {
-      --bg: #0f172a; --panel: #111827; --muted: #94a3b8; --text: #e5e7eb;
-      --accent: #22c55e; --border: #1f2937;
+      --bg: #0f172a;
+      --panel: #111827;
+      --muted: #94a3b8;
+      --text: #e5e7eb;
+      --accent: #22c55e;
+      --border: #1f2937;
     }
     body {
       margin: 0; padding: 24px;
@@ -48,9 +52,12 @@
     <div class="panel" id="auth-panel">
       <input id="email" type="email" placeholder="Email" />
       <input id="password" type="password" placeholder="Password" />
-      <button id="signup-btn">Sign Up</button>
-      <button id="login-btn">Login</button>
-      <button id="logout-btn" style="display:none;">Logout</button>
+      <div class="row">
+        <button id="signup-btn">Sign Up</button>
+        <button id="login-btn">Login</button>
+        <button id="logout-btn" style="display:none;">Logout</button>
+      </div>
+      <div id="auth-status" class="status"></div>
     </div>
 
     <!-- Panel tra từ -->
@@ -78,85 +85,76 @@
 
   <script>
     // 🚀 Supabase config
-    const SUPABASE_URL = "https://kuzzbvqgujfmfzmybmve.supabase.co";
-    const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt1enpidnFndWpmbWZ6bXlibXZlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU3NjM5NDIsImV4cCI6MjA3MTMzOTk0Mn0.57OCv_PKlp96qunrirekCwTaaVOb3YBb-2dgJXWmP4s";
+    const SUPABASE_URL = "YOUR_PROJECT_URL";
+    const SUPABASE_KEY = "YOUR_PUBLIC_ANON_KEY";
     const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
     let currentUser = null;
     const input = document.getElementById("word-input");
     const tbody = document.getElementById("vocab-body");
     const statusEl = document.getElementById("status");
-    const authPanel = document.getElementById("auth-panel");
-    const mainPanel = document.getElementById("main-panel");
-    const logoutBtn = document.getElementById("logout-btn");
+    const authStatus = document.getElementById("auth-status");
 
     function setStatus(msg, err=false) {
       statusEl.textContent = msg;
       statusEl.className = "status" + (err ? " err" : "");
     }
-
-    async function checkSession() {
-      const { data: { session } } = await supabase.auth.getSession();
-      if(session && session.user){
-        currentUser = session.user;
-        authPanel.querySelectorAll("input,button").forEach(el=>el.style.display="none");
-        logoutBtn.style.display="inline-block";
-        mainPanel.style.display="block";
-        loadWords();
-      }
+    function setAuthStatus(msg, err=false) {
+      authStatus.textContent = msg;
+      authStatus.className = "status" + (err ? " err" : "");
     }
-    checkSession();
 
-    // Đăng ký
+    // ✅ Sign Up
     document.getElementById("signup-btn").onclick = async () => {
-      const email = document.getElementById("email").value;
-      const password = document.getElementById("password").value;
+      const email = document.getElementById("email").value.trim();
+      const password = document.getElementById("password").value.trim();
+      if (!email || !password) return setAuthStatus("Email và mật khẩu không được trống!", true);
       const { data, error } = await supabase.auth.signUp({ email, password });
-      if (error) return setStatus(error.message, true);
-      setStatus("Check email để xác nhận đăng ký!");
+      if (error) return setAuthStatus(error.message, true);
+      setAuthStatus("Check email để xác nhận đăng ký!");
     };
 
-    // Đăng nhập
+    // ✅ Login
     document.getElementById("login-btn").onclick = async () => {
-      const email = document.getElementById("email").value;
-      const password = document.getElementById("password").value;
+      const email = document.getElementById("email").value.trim();
+      const password = document.getElementById("password").value.trim();
+      if (!email || !password) return setAuthStatus("Email và mật khẩu không được trống!", true);
       const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) return setStatus(error.message, true);
+      if (error) return setAuthStatus(error.message, true);
       currentUser = data.user;
-      authPanel.querySelectorAll("input,button").forEach(el=>el.style.display="none");
-      logoutBtn.style.display="inline-block";
-      mainPanel.style.display="block";
-      setStatus("Đăng nhập thành công!");
+      setAuthStatus("Đăng nhập thành công!");
+      document.getElementById("main-panel").style.display = "block";
+      document.getElementById("logout-btn").style.display = "inline-block";
       loadWords();
     };
 
-    // Đăng xuất
-    logoutBtn.onclick = async () => {
+    // ✅ Logout
+    document.getElementById("logout-btn").onclick = async () => {
       await supabase.auth.signOut();
       currentUser = null;
       tbody.innerHTML = "";
-      authPanel.querySelectorAll("input,button").forEach(el=>el.style.display="inline-block");
-      logoutBtn.style.display="none";
-      mainPanel.style.display="none";
-      setStatus("Đã đăng xuất!");
+      document.getElementById("main-panel").style.display = "none";
+      document.getElementById("logout-btn").style.display = "none";
+      setAuthStatus("Đã đăng xuất!");
     };
 
-    // Thêm từ
+    // ✅ Add word
     document.getElementById("add-btn").onclick = async () => {
       const word = input.value.trim();
-      if (!word) return;
+      if (!word) return setStatus("Nhập từ trước khi thêm!", true);
+      if (!currentUser) return setStatus("Bạn phải đăng nhập!", true);
       setStatus("Đang tra từ…");
 
       try {
         const res = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${word}`);
         const dict = await res.json();
-        if (!res.ok) throw new Error("Không tìm thấy định nghĩa");
-        const definition = dict[0].meanings[0].definitions[0].definition;
+        if (!res.ok || !dict[0]) throw new Error("Không tìm thấy định nghĩa");
+        const definition = dict[0].meanings[0].definitions[0].definition || "";
         const example = dict[0].meanings[0].definitions[0].example || "";
 
         const viRes = await fetch(`https://api.mymemory.translated.net/get?q=${word}&langpair=en|vi`);
         const viJson = await viRes.json();
-        const vietnamese = viJson.responseData.translatedText;
+        const vietnamese = viJson.responseData.translatedText || "";
 
         const { error } = await supabase.from("user_words").insert([{
           user_id: currentUser.id,
@@ -173,19 +171,27 @@
       }
     };
 
+    // ✅ Load words
     async function loadWords() {
       if (!currentUser) return;
-      const { data, error } = await supabase.from("user_words").select("*").eq("user_id", currentUser.id).order('id',{ascending:false});
-      if (error) return setStatus(error.message,true);
+      const { data, error } = await supabase.from("user_words").select("*").eq("user_id", currentUser.id);
+      if (error) return setStatus(error.message, true);
       tbody.innerHTML = "";
-      data.forEach(r=>addRow({ word:r.word, definition:r.definition, vietnamese:r.meaning_vi, example:r.example }));
+      data.forEach(r => addRow({ word: r.word, definition: r.definition, vietnamese: r.meaning_vi, example: r.example }));
     }
 
     function addRow(w) {
       const tr = document.createElement("tr");
-      tr.innerHTML = `<td>${w.word}</td><td>${w.definition}</td><td>${w.vietnamese}</td><td>${w.example}</td>`;
+      tr.innerHTML = `
+        <td>${w.word}</td>
+        <td>${w.definition}</td>
+        <td>${w.vietnamese}</td>
+        <td>${w.example}</td>`;
       tbody.prepend(tr);
     }
+
+    // Press Enter
+    input.addEventListener("keydown", e => { if (e.key === "Enter") document.getElementById("add-btn").click(); });
   </script>
 </body>
 </html>
