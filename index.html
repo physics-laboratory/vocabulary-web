@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>English Vocab Helper</title>
+  <title>Vocabulary Helper</title>
   <script src="https://unpkg.com/@supabase/supabase-js"></script>
   <style>
     :root {
@@ -14,41 +14,44 @@
       --accent: #22c55e;
       --border: #1f2937;
     }
-    body {
-      margin: 0; padding: 24px;
-      background: linear-gradient(180deg, #0b1220, #0f172a 50%);
-      color: var(--text);
-      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+    body { margin:0; padding:24px; font-family:ui-sans-serif, system-ui; background: var(--bg); color: var(--text);}
+    .container {
+      max-width: 1000px; margin: 0 auto;
     }
-    .container { max-width: 1000px; margin: auto; }
-    h1 { font-size: 28px; margin-bottom: 16px; }
-    .panel {
-      background: rgba(17, 24, 39, 0.7); backdrop-filter: blur(6px);
-      border: 1px solid var(--border); border-radius: 16px; padding: 16px;
-      margin-bottom: 16px;
+    h1 { font-size:28px; margin-bottom:16px; }
+    .panel { background: rgba(17,24,39,0.8); padding:16px; border-radius:16px; margin-bottom:16px; border:1px solid var(--border); }
+    .row { display:grid; grid-template-columns:1fr auto; gap:12px; margin-bottom:12px; }
+    input { padding:12px; border-radius:12px; border:1px solid var(--border); background:#0b1220; color:var(--text); width:100%; }
+    button { padding:12px 16px; border-radius:12px; border:none; background:var(--accent); color:#052e16; font-weight:700; cursor:pointer; }
+    table { width:100%; border-collapse:collapse; margin-top:12px; }
+    th, td { padding:10px; border-top:1px solid var(--border); }
+    th { text-align:left; background:#0b1220; color:#cbd5e1; }
+    .status { margin-top:8px; font-size:14px; color:var(--muted); min-height:20px; }
+    .err { color:#fca5a5; }
+    .pill {
+      display: inline-block; padding: 2px 8px; margin-left: 8px;
+      border-radius: 999px; font-size: 12px; color: #86efac; background: rgba(34,197,94,0.15); border: 1px solid rgba(34,197,94,0.35);
+      vertical-align: baseline;
     }
-    .row { display: grid; grid-template-columns: 1fr auto; gap: 12px; margin-bottom: 16px; }
-    input[type="text"], input[type="email"], input[type="password"] {
-      width: 100%; padding: 12px; border-radius: 12px;
-      border: 1px solid var(--border); background: #0b1220; color: var(--text);
-    }
-    button {
-      padding: 12px 16px; border: none; cursor: pointer;
-      border-radius: 12px; background: var(--accent); color: #052e16;
-      font-weight: 700;
-    }
-    table { width: 100%; border-collapse: collapse; margin-top: 12px; }
-    th, td { padding: 10px; border-top: 1px solid var(--border); }
-    th { background: #0b1220; color: #cbd5e1; text-align: left; }
-    .status { margin-top: 8px; font-size: 14px; color: var(--muted); }
-    .err { color: #fca5a5; }
+    .delete-btn {
+  background: none;   /* bỏ nền */
+  border: none;       /* bỏ viền */
+  color: #fca5a5;     /* màu đỏ nhẹ */
+  cursor: pointer;
+  font-size: 16px;
+  padding: 0;         /* không padding */
+}
+.delete-btn:hover {
+  color: #ff4d4d;     /* đỏ đậm khi hover */
+}
+
   </style>
 </head>
 <body>
   <div class="container">
-    <h1>📚 Vocabulary Helper</h1>
+    <h1>Vocabulary<span class="pill">CongThanh</span></h1>
 
-    <!-- Form login/signup -->
+    <!-- AUTH -->
     <div class="panel" id="auth-panel">
       <input id="email" type="email" placeholder="Email" />
       <input id="password" type="password" placeholder="Password" />
@@ -60,7 +63,7 @@
       <div id="auth-status" class="status"></div>
     </div>
 
-    <!-- Panel tra từ -->
+    <!-- MAIN PANEL -->
     <div class="panel" id="main-panel" style="display:none;">
       <div class="row">
         <input id="word-input" type="text" placeholder="Nhập từ tiếng Anh..." />
@@ -69,13 +72,14 @@
 
       <table>
         <thead>
-          <tr>
-            <th>Word</th>
-            <th>Definition</th>
-            <th>Means (VI)</th>
-            <th>Example</th>
-          </tr>
+            <tr>
+                <th>Word</th>
+                <th>Definition</th>
+                <th>Means</th>
+                <th>Action</th> <!-- cột mới -->
+            </tr>
         </thead>
+
         <tbody id="vocab-body"></tbody>
       </table>
 
@@ -84,71 +88,66 @@
   </div>
 
   <script>
-    // 🚀 Supabase config
-    const SUPABASE_URL = "YOUR_PROJECT_URL";
-    const SUPABASE_KEY = "YOUR_PUBLIC_ANON_KEY";
+    // Supabase
+    const SUPABASE_URL = "https://kuzzbvqgujfmfzmybmve.supabase.co";
+    const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt1enpidnFndWpmbWZ6bXlibXZlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU3NjM5NDIsImV4cCI6MjA3MTMzOTk0Mn0.57OCv_PKlp96qunrirekCwTaaVOb3YBb-2dgJXWmP4s";
     const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
     let currentUser = null;
+
     const input = document.getElementById("word-input");
     const tbody = document.getElementById("vocab-body");
     const statusEl = document.getElementById("status");
     const authStatus = document.getElementById("auth-status");
 
-    function setStatus(msg, err=false) {
-      statusEl.textContent = msg;
-      statusEl.className = "status" + (err ? " err" : "");
-    }
-    function setAuthStatus(msg, err=false) {
-      authStatus.textContent = msg;
-      authStatus.className = "status" + (err ? " err" : "");
-    }
+    function setStatus(msg, isErr=false) { statusEl.textContent=msg; statusEl.className="status"+(isErr?" err":""); }
+    function setAuthStatus(msg, isErr=false) { authStatus.textContent=msg; authStatus.className="status"+(isErr?" err":""); }
 
-    // ✅ Sign Up
+    // SIGN UP
     document.getElementById("signup-btn").onclick = async () => {
       const email = document.getElementById("email").value.trim();
       const password = document.getElementById("password").value.trim();
-      if (!email || !password) return setAuthStatus("Email và mật khẩu không được trống!", true);
-      const { data, error } = await supabase.auth.signUp({ email, password });
-      if (error) return setAuthStatus(error.message, true);
+      if(!email||!password) return setAuthStatus("Email và mật khẩu không được trống!", true);
+      const { data, error } = await supabase.auth.signUp({email,password});
+      if(error) return setAuthStatus(error.message,true);
       setAuthStatus("Check email để xác nhận đăng ký!");
     };
 
-    // ✅ Login
+    // LOGIN
     document.getElementById("login-btn").onclick = async () => {
       const email = document.getElementById("email").value.trim();
       const password = document.getElementById("password").value.trim();
-      if (!email || !password) return setAuthStatus("Email và mật khẩu không được trống!", true);
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) return setAuthStatus(error.message, true);
+      if(!email||!password) return setAuthStatus("Email và mật khẩu không được trống!", true);
+      const { data, error } = await supabase.auth.signInWithPassword({email,password});
+      if(error) return setAuthStatus(error.message,true);
       currentUser = data.user;
       setAuthStatus("Đăng nhập thành công!");
-      document.getElementById("main-panel").style.display = "block";
-      document.getElementById("logout-btn").style.display = "inline-block";
+      document.getElementById("main-panel").style.display="block";
+      document.getElementById("logout-btn").style.display="inline-block";
       loadWords();
     };
 
-    // ✅ Logout
+    // LOGOUT
     document.getElementById("logout-btn").onclick = async () => {
       await supabase.auth.signOut();
       currentUser = null;
-      tbody.innerHTML = "";
-      document.getElementById("main-panel").style.display = "none";
-      document.getElementById("logout-btn").style.display = "none";
+      tbody.innerHTML="";
+      document.getElementById("main-panel").style.display="none";
+      document.getElementById("logout-btn").style.display="none";
       setAuthStatus("Đã đăng xuất!");
     };
 
-    // ✅ Add word
+    // ADD WORD
     document.getElementById("add-btn").onclick = async () => {
       const word = input.value.trim();
-      if (!word) return setStatus("Nhập từ trước khi thêm!", true);
-      if (!currentUser) return setStatus("Bạn phải đăng nhập!", true);
+      if(!word) return setStatus("Nhập từ trước khi thêm!", true);
+      if(!currentUser) return setStatus("Bạn phải đăng nhập!", true);
       setStatus("Đang tra từ…");
 
-      try {
+      try{
         const res = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${word}`);
         const dict = await res.json();
-        if (!res.ok || !dict[0]) throw new Error("Không tìm thấy định nghĩa");
+        if(!res.ok||!dict[0]) throw new Error("Không tìm thấy định nghĩa");
         const definition = dict[0].meanings[0].definitions[0].definition || "";
         const example = dict[0].meanings[0].definitions[0].example || "";
 
@@ -158,40 +157,65 @@
 
         const { error } = await supabase.from("user_words").insert([{
           user_id: currentUser.id,
-          word, definition, meaning_vi: vietnamese, example
+          word, definition, meaning_vi:vietnamese, example
         }]);
-        if (error) throw error;
+        if(error) throw error;
 
-        addRow({ word, definition, vietnamese, example });
+        addRow({word, definition, vietnamese, example});
         setStatus("Đã thêm từ!");
-        input.value = "";
-      } catch (err) {
+        input.value="";
+      } catch(err){
         console.error(err);
-        setStatus("Lỗi khi tra từ hoặc lưu!", true);
+        setStatus("Lỗi khi tra từ hoặc lưu!",true);
       }
     };
 
-    // ✅ Load words
-    async function loadWords() {
-      if (!currentUser) return;
+    // LOAD WORDS
+    async function loadWords(){
+      if(!currentUser) return;
       const { data, error } = await supabase.from("user_words").select("*").eq("user_id", currentUser.id);
-      if (error) return setStatus(error.message, true);
-      tbody.innerHTML = "";
-      data.forEach(r => addRow({ word: r.word, definition: r.definition, vietnamese: r.meaning_vi, example: r.example }));
+      if(error) return setStatus(error.message,true);
+      tbody.innerHTML="";
+      data.forEach(r=>addRow({word:r.word,definition:r.definition,vietnamese:r.meaning_vi,example:r.example}));
     }
 
     function addRow(w) {
-      const tr = document.createElement("tr");
-      tr.innerHTML = `
-        <td>${w.word}</td>
-        <td>${w.definition}</td>
-        <td>${w.vietnamese}</td>
-        <td>${w.example}</td>`;
-      tbody.prepend(tr);
-    }
+  const tr = document.createElement("tr");
 
-    // Press Enter
-    input.addEventListener("keydown", e => { if (e.key === "Enter") document.getElementById("add-btn").click(); });
+  tr.innerHTML = `
+  <td>${w.word}</td>
+  <td>${w.definition}</td>
+  <td>${w.vietnamese}</td>
+  <td><button class="delete-btn">❌</button></td>
+`;
+
+
+  // Xử lý sự kiện xóa
+  tr.querySelector(".delete-btn").onclick = async () => {
+    if(!currentUser) return setStatus("Bạn phải đăng nhập!", true);
+    try {
+      // Xóa trong Supabase
+      const { error } = await supabase
+        .from("user_words")
+        .delete()
+        .eq("user_id", currentUser.id)
+        .eq("word", w.word); // xóa theo user + từ
+      if(error) throw error;
+
+      // Xóa khỏi bảng HTML
+      tr.remove();
+      setStatus(`Đã xóa từ "${w.word}"`);
+    } catch(err) {
+      console.error(err);
+      setStatus("Lỗi khi xóa từ!", true);
+    }
+  };
+
+  tbody.prepend(tr);
+}
+
+
+    input.addEventListener("keydown", e=>{ if(e.key==="Enter") document.getElementById("add-btn").click(); });
   </script>
 </body>
 </html>
